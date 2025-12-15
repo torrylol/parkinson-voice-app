@@ -137,6 +137,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
+          console.log('Chunk received:', event.data.size, 'bytes. Current batch has', currentBatchChunksRef.current.length, 'chunks')
           audioChunksRef.current.push(event.data)
           currentBatchChunksRef.current.push(event.data)
         }
