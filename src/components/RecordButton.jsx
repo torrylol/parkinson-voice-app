@@ -89,13 +89,39 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
     console.log('Processing batch with', currentBatchChunksRef.current.length, 'chunks, total size:', audioBlob.size, 'bytes')
 
-    // Clear current batch (ready for next batch while this one processes)
-    currentBatchChunksRef.current = []
-
     // Reset silence timer
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current)
       silenceTimerRef.current = null
+    }
+
+    // CRITICAL: Stop and restart MediaRecorder to get a fresh WebM container with header
+    // WebM format requires a header at the start - we can't just send middle chunks
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop()
+
+      // Wait a bit for stop to complete, then restart
+      setTimeout(() => {
+        if (streamRef.current && isRecording) {
+          const mediaRecorder = new MediaRecorder(streamRef.current, {
+            mimeType: 'audio/webm'
+          })
+
+          mediaRecorderRef.current = mediaRecorder
+          currentBatchChunksRef.current = []
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              console.log('Chunk received:', event.data.size, 'bytes. Current batch has', currentBatchChunksRef.current.length, 'chunks')
+              audioChunksRef.current.push(event.data)
+              currentBatchChunksRef.current.push(event.data)
+            }
+          }
+
+          mediaRecorder.start(100)
+          console.log('MediaRecorder restarted for next batch')
+        }
+      }, 100)
     }
 
     // Send to API (this happens in background while recording continues)
