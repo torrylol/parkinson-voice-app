@@ -35,6 +35,12 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
+  // Don't cache POST requests or API calls
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request))
+    return
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
