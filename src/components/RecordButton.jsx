@@ -70,7 +70,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
     setIsProcessing(true)
 
-    // Create blob from current batch
+    // Create blob from current batch BEFORE clearing
     const audioBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
 
     // Validate blob size (WebM files need minimum size to be valid - at least 0.5 seconds of audio)
@@ -98,30 +98,31 @@ function RecordButton({ onTranscription, isCommandMode }) {
     // CRITICAL: Stop and restart MediaRecorder to get a fresh WebM container with header
     // WebM format requires a header at the start - we can't just send middle chunks
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      // Stop current recorder
       mediaRecorderRef.current.stop()
 
-      // Wait a bit for stop to complete, then restart
-      setTimeout(() => {
-        if (streamRef.current && isRecording) {
-          const mediaRecorder = new MediaRecorder(streamRef.current, {
-            mimeType: 'audio/webm'
-          })
+      // Clear chunks AFTER creating blob but BEFORE restarting
+      currentBatchChunksRef.current = []
 
-          mediaRecorderRef.current = mediaRecorder
-          currentBatchChunksRef.current = []
+      // Restart immediately (don't use setTimeout - causes detectSilence to stop)
+      if (streamRef.current && isRecording) {
+        const mediaRecorder = new MediaRecorder(streamRef.current, {
+          mimeType: 'audio/webm'
+        })
 
-          mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-              console.log('Chunk received:', event.data.size, 'bytes. Current batch has', currentBatchChunksRef.current.length, 'chunks')
-              audioChunksRef.current.push(event.data)
-              currentBatchChunksRef.current.push(event.data)
-            }
+        mediaRecorderRef.current = mediaRecorder
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            console.log('Chunk received:', event.data.size, 'bytes. Current batch has', currentBatchChunksRef.current.length, 'chunks')
+            audioChunksRef.current.push(event.data)
+            currentBatchChunksRef.current.push(event.data)
           }
-
-          mediaRecorder.start(100)
-          console.log('MediaRecorder restarted for next batch')
         }
-      }, 100)
+
+        mediaRecorder.start(100)
+        console.log('MediaRecorder restarted for next batch')
+      }
     }
 
     // Send to API (this happens in background while recording continues)
