@@ -23,7 +23,9 @@ function RecordButton({ onTranscription, isCommandMode }) {
   }, [isCommandMode])
 
   const detectSilence = () => {
-    if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+    // Don't check MediaRecorder state here - it might be temporarily stopped during batch processing
+    // Just check if we're still supposed to be recording based on isRecording flag
+    if (!analyserRef.current || !isRecording) {
       return
     }
 
