@@ -50,12 +50,13 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
   const sendAudioToAPI = async (audioBlob) => {
     try {
+      // Create FormData to send the audio file
+      const formData = new FormData()
+      formData.append('file', audioBlob, 'audio.webm')
+
       const response = await fetch('/api/transcribe', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'audio/webm',
-        },
-        body: audioBlob,
+        body: formData,
       })
 
       const data = await response.json()

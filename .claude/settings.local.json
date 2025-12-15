@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm create vite@latest:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nAdd Vercel configuration and environment setup\n\n- Create vercel.json for API route handling\n- Add .env.example with OpenAI API key template\n- Document environment variable setup for Vercel deployment\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd Vercel configuration and environment setup\n\n- Create vercel.json for API route handling\n- Add .env.example with OpenAI API key template\n- Document environment variable setup for Vercel deployment\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd serverless API functions for transcription and text fixing\n\n- Create /api/transcribe.js: Whisper API integration with Norwegian language\n- Create /api/fix-text.js: GPT-4o integration for text cleanup\n- Implement comprehensive error handling with Norwegian messages\n- Add CORS support for API endpoints\n- Handle rate limiting and authentication errors\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")"
     ]
   }
 }

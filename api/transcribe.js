@@ -1,5 +1,12 @@
-import fetch from 'node-fetch';
-import formData from 'form-data';
+import OpenAI from 'openai';
+import formidable from 'formidable';
+import fs from 'fs';
+
+export const config = {
+  api: {
+    bodyParser: false, // Disable default body parser to use formidable
+  },
+};
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -22,56 +29,55 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'API key ikke konfigurert' });
     }
 
-    // Get audio data from request body
-    const audioBuffer = req.body;
+    // Parse the multipart form data
+    const form = formidable({ multiples: false });
 
-    if (!audioBuffer || audioBuffer.length === 0) {
+    const [, files] = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) reject(err);
+        else resolve([fields, files]);
+      });
+    });
+
+    const audioFile = files.file?.[0] || files.file;
+
+    if (!audioFile) {
       return res.status(400).json({ error: 'Ingen lydfil mottatt' });
     }
 
-    // Create form data for OpenAI API
-    const form = new formData();
-    form.append('file', audioBuffer, {
-      filename: 'audio.webm',
-      contentType: 'audio/webm',
+    // Initialize OpenAI client
+    const openai = new OpenAI({ apiKey });
+
+    // Read the file and create a File object
+    const fileBuffer = fs.readFileSync(audioFile.filepath);
+    const file = new File([fileBuffer], audioFile.originalFilename || 'audio.webm', {
+      type: audioFile.mimetype || 'audio/webm'
     });
-    form.append('model', 'whisper-1');
-    form.append('language', 'no');
 
     // Call OpenAI Whisper API
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...form.getHeaders(),
-      },
-      body: form,
+    const transcription = await openai.audio.transcriptions.create({
+      file: file,
+      model: 'whisper-1',
+      language: 'no',
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API error:', errorData);
+    // Clean up temp file
+    fs.unlinkSync(audioFile.filepath);
 
-      if (response.status === 401) {
-        return res.status(500).json({ error: 'Ugyldig API-nøkkel' });
-      }
-      if (response.status === 429) {
-        return res.status(429).json({ error: 'For mange forespørsler. Prøv igjen om litt.' });
-      }
-
-      return res.status(500).json({
-        error: errorData.error?.message || 'Transkribering feilet'
-      });
-    }
-
-    const data = await response.json();
-
-    return res.status(200).json({ text: data.text });
+    return res.status(200).json({ text: transcription.text });
 
   } catch (error) {
     console.error('Transcription error:', error);
+
+    if (error.status === 401) {
+      return res.status(500).json({ error: 'Ugyldig API-nøkkel' });
+    }
+    if (error.status === 429) {
+      return res.status(429).json({ error: 'For mange forespørsler. Prøv igjen om litt.' });
+    }
+
     return res.status(500).json({
-      error: 'En feil oppstod under transkribering: ' + error.message
+      error: 'En feil oppstod under transkribering: ' + (error.message || 'Ukjent feil')
     });
   }
 }
