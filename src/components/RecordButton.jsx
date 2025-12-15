@@ -72,14 +72,16 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
     setIsProcessing(true)
 
-    // Create blob from current batch BEFORE clearing
-    const audioBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
+    // Save current chunks BEFORE any operations
+    const chunksToSend = [...currentBatchChunksRef.current]
+
+    // Create blob from saved chunks
+    const audioBlob = new Blob(chunksToSend, { type: 'audio/webm' })
 
     // Validate blob size (WebM files need minimum size to be valid - at least 0.5 seconds of audio)
     // At 100ms chunks, 3 seconds of silence = ~30 chunks, each ~500-2000 bytes = minimum 15KB
     if (audioBlob.size < 10000) {
       console.warn('Audio blob too small, skipping:', audioBlob.size, 'bytes')
-      currentBatchChunksRef.current = []
       setIsProcessing(false)
       // Clear silence timer to restart detection
       if (silenceTimerRef.current) {
@@ -89,10 +91,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
       return
     }
 
-    console.log('Processing batch with', currentBatchChunksRef.current.length, 'chunks, total size:', audioBlob.size, 'bytes')
-
-    // Clear current batch for next batch
-    currentBatchChunksRef.current = []
+    console.log('Processing batch with', chunksToSend.length, 'chunks, total size:', audioBlob.size, 'bytes')
 
     // Reset silence timer
     if (silenceTimerRef.current) {
@@ -100,7 +99,40 @@ function RecordButton({ onTranscription, isCommandMode }) {
       silenceTimerRef.current = null
     }
 
-    // Send to API (this happens in background while recording continues)
+    // CRITICAL: Stop and restart MediaRecorder to get fresh WebM header for next batch
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording' && streamRef.current) {
+      // Remove event handler from old recorder
+      const oldRecorder = mediaRecorderRef.current
+      oldRecorder.ondataavailable = null
+
+      // Stop the current recorder (this may trigger final ondataavailable, but handler is now null)
+      oldRecorder.stop()
+
+      // Clear the batch array for the new recording
+      currentBatchChunksRef.current = []
+
+      // Small delay to let stop() complete
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // Create and start new recorder
+      const newRecorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'audio/webm'
+      })
+
+      newRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          console.log('Chunk received:', event.data.size, 'bytes. Current batch has', currentBatchChunksRef.current.length, 'chunks')
+          audioChunksRef.current.push(event.data)
+          currentBatchChunksRef.current.push(event.data)
+        }
+      }
+
+      newRecorder.start(100)
+      mediaRecorderRef.current = newRecorder
+      console.log('MediaRecorder restarted for next batch')
+    }
+
+    // Send to API (this happens while new recording has started)
     try {
       await sendAudioToAPI(audioBlob)
     } catch (error) {
