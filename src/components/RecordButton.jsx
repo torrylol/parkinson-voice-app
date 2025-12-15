@@ -23,31 +23,32 @@ function RecordButton({ onTranscription, isCommandMode }) {
   }, [isCommandMode])
 
   const detectSilence = () => {
-    if (!analyserRef.current) return
+    if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+      return
+    }
 
     const bufferLength = analyserRef.current.fftSize
     const dataArray = new Uint8Array(bufferLength)
     analyserRef.current.getByteTimeDomainData(dataArray)
 
-    // Calculate audio level
+    // Calculate audio level (RMS)
     let sum = 0
     for (let i = 0; i < bufferLength; i++) {
       const normalized = (dataArray[i] - 128) / 128
       sum += normalized * normalized
     }
     const rms = Math.sqrt(sum / bufferLength)
-    const db = 20 * Math.log10(rms)
 
-    // Threshold for silence (adjust as needed, -50 is quite sensitive)
-    const SILENCE_THRESHOLD = -50
+    // Threshold for silence - higher value = more sensitive (0.01 is good for normal speech)
+    const SILENCE_THRESHOLD = 0.01
 
-    if (db < SILENCE_THRESHOLD) {
+    if (rms < SILENCE_THRESHOLD) {
       // Start silence timer if not already started
       if (!silenceTimerRef.current) {
         silenceTimerRef.current = setTimeout(() => {
-          // 2 seconds of silence detected, send batch
+          // 3 seconds of silence detected, send batch
           processBatch()
-        }, 2000)
+        }, 3000)
       }
     } else {
       // Clear silence timer if sound detected
@@ -57,21 +58,22 @@ function RecordButton({ onTranscription, isCommandMode }) {
       }
     }
 
-    // Continue monitoring if still recording
-    if (isRecording) {
-      requestAnimationFrame(detectSilence)
-    }
+    // Continue monitoring
+    requestAnimationFrame(detectSilence)
   }
 
   const processBatch = async () => {
     if (currentBatchChunksRef.current.length === 0) return
+
+    // Don't process if already processing
+    if (isProcessing) return
 
     setIsProcessing(true)
 
     // Create blob from current batch
     const audioBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
 
-    // Clear current batch
+    // Clear current batch (ready for next batch while this one processes)
     currentBatchChunksRef.current = []
 
     // Reset silence timer
@@ -80,9 +82,14 @@ function RecordButton({ onTranscription, isCommandMode }) {
       silenceTimerRef.current = null
     }
 
-    // Send to API
-    await sendAudioToAPI(audioBlob)
-    setIsProcessing(false)
+    // Send to API (this happens in background while recording continues)
+    try {
+      await sendAudioToAPI(audioBlob)
+    } catch (error) {
+      console.error('Batch processing error:', error)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const startRecording = async () => {
@@ -137,32 +144,42 @@ function RecordButton({ onTranscription, isCommandMode }) {
     }
   }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      // Stop media recorder
+  const stopRecording = async () => {
+    if (!mediaRecorderRef.current || !isRecording) return
+
+    // Set state to false immediately to stop detectSilence loop
+    setIsRecording(false)
+
+    // Stop media recorder
+    if (mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
-
-      // Process final batch if any
-      if (currentBatchChunksRef.current.length > 0) {
-        processBatch()
-      }
-
-      // Clean up
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-      }
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current)
-      }
-      if (maxRecordingTimerRef.current) {
-        clearTimeout(maxRecordingTimerRef.current)
-      }
-
-      setIsRecording(false)
     }
+
+    // Process final batch if any
+    if (currentBatchChunksRef.current.length > 0) {
+      await processBatch()
+    }
+
+    // Clean up
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+    if (maxRecordingTimerRef.current) {
+      clearTimeout(maxRecordingTimerRef.current)
+      maxRecordingTimerRef.current = null
+    }
+
+    mediaRecorderRef.current = null
+    analyserRef.current = null
   }
 
   const sendAudioToAPI = async (audioBlob) => {
