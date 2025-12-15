@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm create vite@latest:*)"
+      "Bash(npm create vite@latest:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd Vercel configuration and environment setup\n\n- Create vercel.json for API route handling\n- Add .env.example with OpenAI API key template\n- Document environment variable setup for Vercel deployment\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")"
     ]
   }
 }
