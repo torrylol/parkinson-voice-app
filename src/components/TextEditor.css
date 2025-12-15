@@ -1,0 +1,54 @@
+.text-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.text-editor-label {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+}
+
+.text-editor {
+  width: 100%;
+  min-height: 300px;
+  padding: 20px;
+  font-size: 20px;
+  line-height: 1.8;
+  color: #000;
+  background: #fff;
+  border: 3px solid #e0e0e0;
+  border-radius: 8px;
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.text-editor:hover {
+  border-color: #bdbdbd;
+}
+
+.text-editor:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.text-editor::placeholder {
+  color: #9e9e9e;
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .text-editor-label {
+    font-size: 20px;
+  }
+
+  .text-editor {
+    font-size: 18px;
+    padding: 16px;
+    min-height: 250px;
+  }
+}
