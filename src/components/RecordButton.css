@@ -20,21 +20,39 @@
   transition: all 0.2s ease;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   position: relative;
-  touch-action: none;
 }
 
-.record-button:hover {
+.record-button:hover:not(:disabled) {
   transform: scale(1.05);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
-.record-button:active {
+.record-button:active:not(:disabled) {
   transform: scale(0.98);
+}
+
+.record-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .record-button.recording {
   background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+.record-button.processing {
+  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes pulse {

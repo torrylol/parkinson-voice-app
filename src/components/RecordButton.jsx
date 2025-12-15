@@ -1,40 +1,136 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './RecordButton.css'
 
 function RecordButton({ onTranscription, isCommandMode }) {
   const [isRecording, setIsRecording] = useState(false)
   const [error, setError] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
+  const streamRef = useRef(null)
+  const audioContextRef = useRef(null)
+  const analyserRef = useRef(null)
+  const silenceTimerRef = useRef(null)
+  const maxRecordingTimerRef = useRef(null)
+  const currentBatchChunksRef = useRef([])
+
+  // Stop recording when switching to command mode
+  useEffect(() => {
+    if (isCommandMode && isRecording) {
+      stopRecording()
+    }
+  }, [isCommandMode])
+
+  const detectSilence = () => {
+    if (!analyserRef.current) return
+
+    const bufferLength = analyserRef.current.fftSize
+    const dataArray = new Uint8Array(bufferLength)
+    analyserRef.current.getByteTimeDomainData(dataArray)
+
+    // Calculate audio level
+    let sum = 0
+    for (let i = 0; i < bufferLength; i++) {
+      const normalized = (dataArray[i] - 128) / 128
+      sum += normalized * normalized
+    }
+    const rms = Math.sqrt(sum / bufferLength)
+    const db = 20 * Math.log10(rms)
+
+    // Threshold for silence (adjust as needed, -50 is quite sensitive)
+    const SILENCE_THRESHOLD = -50
+
+    if (db < SILENCE_THRESHOLD) {
+      // Start silence timer if not already started
+      if (!silenceTimerRef.current) {
+        silenceTimerRef.current = setTimeout(() => {
+          // 2 seconds of silence detected, send batch
+          processBatch()
+        }, 2000)
+      }
+    } else {
+      // Clear silence timer if sound detected
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
+    }
+
+    // Continue monitoring if still recording
+    if (isRecording) {
+      requestAnimationFrame(detectSilence)
+    }
+  }
+
+  const processBatch = async () => {
+    if (currentBatchChunksRef.current.length === 0) return
+
+    setIsProcessing(true)
+
+    // Create blob from current batch
+    const audioBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
+
+    // Clear current batch
+    currentBatchChunksRef.current = []
+
+    // Reset silence timer
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+
+    // Send to API
+    await sendAudioToAPI(audioBlob)
+    setIsProcessing(false)
+  }
 
   const startRecording = async () => {
     try {
       setError('')
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
 
+      // Set up audio context for silence detection
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      audioContextRef.current = audioContext
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 2048
+      analyser.smoothingTimeConstant = 0.8
+
+      source.connect(analyser)
+      analyserRef.current = analyser
+
+      // Set up MediaRecorder with timeslice for continuous chunks
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm'
       })
 
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
+      currentBatchChunksRef.current = []
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data)
+          currentBatchChunksRef.current.push(event.data)
         }
       }
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        await sendAudioToAPI(audioBlob)
-
-        // Stop all tracks
-        stream.getTracks().forEach(track => track.stop())
-      }
-
-      mediaRecorder.start()
+      // Start recording with 100ms timeslice for continuous data
+      mediaRecorder.start(100)
       setIsRecording(true)
+
+      // Start silence detection
+      detectSilence()
+
+      // Auto-stop after 10 minutes
+      maxRecordingTimerRef.current = setTimeout(() => {
+        stopRecording()
+      }, 10 * 60 * 1000) // 10 minutes
+
     } catch (err) {
       console.error('Recording error:', err)
       setError('Kunne ikke starte opptak. Sjekk mikrofon-tillatelser.')
@@ -43,7 +139,28 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      // Stop media recorder
       mediaRecorderRef.current.stop()
+
+      // Process final batch if any
+      if (currentBatchChunksRef.current.length > 0) {
+        processBatch()
+      }
+
+      // Clean up
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+      }
+      if (maxRecordingTimerRef.current) {
+        clearTimeout(maxRecordingTimerRef.current)
+      }
+
       setIsRecording(false)
     }
   }
@@ -74,34 +191,21 @@ function RecordButton({ onTranscription, isCommandMode }) {
     }
   }
 
-  const handleMouseDown = () => {
-    startRecording()
-  }
-
-  const handleMouseUp = () => {
-    stopRecording()
-  }
-
-  const handleTouchStart = (e) => {
-    e.preventDefault()
-    startRecording()
-  }
-
-  const handleTouchEnd = (e) => {
-    e.preventDefault()
-    stopRecording()
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
   }
 
   return (
     <div className="record-button-container">
       <button
-        className={`record-button ${isRecording ? 'recording' : ''}`}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={stopRecording}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        aria-label={isRecording ? 'Tar opp...' : 'Hold inne for å ta opp'}
+        className={`record-button ${isRecording ? 'recording' : ''} ${isProcessing ? 'processing' : ''}`}
+        onClick={handleToggleRecording}
+        disabled={isProcessing}
+        aria-label={isRecording ? 'Stopp opptak' : 'Start opptak'}
       >
         <div className="record-icon">
           {isRecording ? (
@@ -113,7 +217,11 @@ function RecordButton({ onTranscription, isCommandMode }) {
       </button>
 
       <p className="record-instruction">
-        {isRecording ? 'Snakk nå... Slipp for å stoppe' : 'Hold inne for å ta opp'}
+        {isRecording
+          ? 'Snakk nå... Pause sender tekst automatisk'
+          : isProcessing
+            ? 'Behandler...'
+            : 'Klikk for å starte opptak'}
       </p>
 
       {error && (
