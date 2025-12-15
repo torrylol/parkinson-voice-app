@@ -73,6 +73,22 @@ function RecordButton({ onTranscription, isCommandMode }) {
     // Create blob from current batch
     const audioBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
 
+    // Validate blob size (WebM files need minimum size to be valid - at least 0.5 seconds of audio)
+    // At 100ms chunks, 3 seconds of silence = ~30 chunks, each ~500-2000 bytes = minimum 15KB
+    if (audioBlob.size < 10000) {
+      console.warn('Audio blob too small, skipping:', audioBlob.size, 'bytes')
+      currentBatchChunksRef.current = []
+      setIsProcessing(false)
+      // Clear silence timer to restart detection
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current)
+        silenceTimerRef.current = null
+      }
+      return
+    }
+
+    console.log('Processing batch with', currentBatchChunksRef.current.length, 'chunks, total size:', audioBlob.size, 'bytes')
+
     // Clear current batch (ready for next batch while this one processes)
     currentBatchChunksRef.current = []
 
@@ -184,6 +200,8 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
   const sendAudioToAPI = async (audioBlob) => {
     try {
+      console.log('Sending audio blob, size:', audioBlob.size, 'bytes')
+
       // Create FormData to send the audio file
       const formData = new FormData()
       formData.append('file', audioBlob, 'audio.webm')
@@ -200,6 +218,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
       }
 
       if (data.text) {
+        console.log('Transcription received:', data.text)
         onTranscription(data.text, isCommandMode)
       }
     } catch (err) {
