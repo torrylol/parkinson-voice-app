@@ -14,18 +14,18 @@ function RecordButton({ onTranscription, isCommandMode }) {
   const silenceTimerRef = useRef(null)
   const maxRecordingTimerRef = useRef(null)
   const currentBatchChunksRef = useRef([])
+  const isRecordingRef = useRef(false) // Ref version for immediate access in detectSilence
 
   // Stop recording when switching to command mode
   useEffect(() => {
     if (isCommandMode && isRecording) {
       stopRecording()
     }
-  }, [isCommandMode])
+  }, [isCommandMode, isRecording])
 
   const detectSilence = () => {
-    // Don't check MediaRecorder state here - it might be temporarily stopped during batch processing
-    // Just check if we're still supposed to be recording based on isRecording flag
-    if (!analyserRef.current || !isRecording) {
+    // Use ref instead of state to avoid closure issues and race conditions
+    if (!analyserRef.current || !isRecordingRef.current) {
       return
     }
 
@@ -91,40 +91,13 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
     console.log('Processing batch with', currentBatchChunksRef.current.length, 'chunks, total size:', audioBlob.size, 'bytes')
 
+    // Clear current batch for next batch
+    currentBatchChunksRef.current = []
+
     // Reset silence timer
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current)
       silenceTimerRef.current = null
-    }
-
-    // CRITICAL: Stop and restart MediaRecorder to get a fresh WebM container with header
-    // WebM format requires a header at the start - we can't just send middle chunks
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      // Stop current recorder
-      mediaRecorderRef.current.stop()
-
-      // Clear chunks AFTER creating blob but BEFORE restarting
-      currentBatchChunksRef.current = []
-
-      // Restart immediately (don't use setTimeout - causes detectSilence to stop)
-      if (streamRef.current && isRecording) {
-        const mediaRecorder = new MediaRecorder(streamRef.current, {
-          mimeType: 'audio/webm'
-        })
-
-        mediaRecorderRef.current = mediaRecorder
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            console.log('Chunk received:', event.data.size, 'bytes. Current batch has', currentBatchChunksRef.current.length, 'chunks')
-            audioChunksRef.current.push(event.data)
-            currentBatchChunksRef.current.push(event.data)
-          }
-        }
-
-        mediaRecorder.start(100)
-        console.log('MediaRecorder restarted for next batch')
-      }
     }
 
     // Send to API (this happens in background while recording continues)
@@ -174,9 +147,12 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
       // Start recording with 100ms timeslice for continuous data
       mediaRecorder.start(100)
-      setIsRecording(true)
 
-      // Start silence detection
+      // Set BOTH state and ref
+      setIsRecording(true)
+      isRecordingRef.current = true
+
+      // Start silence detection AFTER setting the ref
       detectSilence()
 
       // Auto-stop after 10 minutes
@@ -191,19 +167,27 @@ function RecordButton({ onTranscription, isCommandMode }) {
   }
 
   const stopRecording = async () => {
-    if (!mediaRecorderRef.current || !isRecording) return
+    if (!mediaRecorderRef.current || !isRecordingRef.current) return
 
-    // Set state to false immediately to stop detectSilence loop
+    // Set BOTH state and ref to false immediately to stop detectSilence loop
     setIsRecording(false)
+    isRecordingRef.current = false
 
     // Stop media recorder
     if (mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     }
 
+    // Wait a bit for final chunks to arrive before processing
+    await new Promise(resolve => setTimeout(resolve, 200))
+
     // Process final batch if any
     if (currentBatchChunksRef.current.length > 0) {
-      await processBatch()
+      const finalBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
+      if (finalBlob.size >= 10000) {
+        console.log('Processing final batch:', finalBlob.size, 'bytes')
+        await sendAudioToAPI(finalBlob)
+      }
     }
 
     // Clean up
