@@ -15,6 +15,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
   const maxRecordingTimerRef = useRef(null)
   const currentBatchChunksRef = useRef([])
   const isRecordingRef = useRef(false) // Ref version for immediate access in detectSilence
+  const isProcessingRef = useRef(false) // Ref version for synchronous check to prevent race conditions
   const prevCommandModeRef = useRef(isCommandMode) // Track previous command mode state
 
   // Stop recording only when SWITCHING to command mode (not when already in it)
@@ -72,13 +73,17 @@ function RecordButton({ onTranscription, isCommandMode }) {
   const processBatch = async () => {
     if (currentBatchChunksRef.current.length === 0) return
 
-    // Don't process if already processing
-    if (isProcessing) return
+    // Use ref for synchronous check to prevent race conditions (React state is async)
+    if (isProcessingRef.current) return
 
+    // Set BOTH ref and state immediately
+    isProcessingRef.current = true
     setIsProcessing(true)
 
-    // Save current chunks BEFORE any operations
+    // Save current chunks and IMMEDIATELY clear the batch array
+    // This prevents stopRecording() from processing the same chunks
     const chunksToSend = [...currentBatchChunksRef.current]
+    currentBatchChunksRef.current = []
 
     // Create blob from saved chunks
     const audioBlob = new Blob(chunksToSend, { type: 'audio/webm' })
@@ -87,6 +92,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
     // At 100ms chunks, 3 seconds of silence = ~30 chunks, each ~500-2000 bytes = minimum 15KB
     if (audioBlob.size < 10000) {
       console.warn('Audio blob too small, skipping:', audioBlob.size, 'bytes')
+      isProcessingRef.current = false
       setIsProcessing(false)
       // Clear silence timer to restart detection
       if (silenceTimerRef.current) {
@@ -112,9 +118,6 @@ function RecordButton({ onTranscription, isCommandMode }) {
 
       // Stop the current recorder (this may trigger final ondataavailable, but handler is now null)
       oldRecorder.stop()
-
-      // Clear the batch array for the new recording
-      currentBatchChunksRef.current = []
 
       // Small delay to let stop() complete
       await new Promise(resolve => setTimeout(resolve, 50))
@@ -143,6 +146,7 @@ function RecordButton({ onTranscription, isCommandMode }) {
     } catch (error) {
       console.error('Batch processing error:', error)
     } finally {
+      isProcessingRef.current = false
       setIsProcessing(false)
     }
   }
@@ -218,9 +222,11 @@ function RecordButton({ onTranscription, isCommandMode }) {
     // Wait a bit for final chunks to arrive before processing
     await new Promise(resolve => setTimeout(resolve, 200))
 
-    // Process final batch if any
-    if (currentBatchChunksRef.current.length > 0) {
-      const finalBlob = new Blob(currentBatchChunksRef.current, { type: 'audio/webm' })
+    // Process final batch if any, but only if not already being processed by processBatch()
+    if (currentBatchChunksRef.current.length > 0 && !isProcessingRef.current) {
+      const finalChunks = [...currentBatchChunksRef.current]
+      currentBatchChunksRef.current = [] // Clear immediately to prevent double processing
+      const finalBlob = new Blob(finalChunks, { type: 'audio/webm' })
       if (finalBlob.size >= 10000) {
         console.log('Processing final batch:', finalBlob.size, 'bytes')
         await sendAudioToAPI(finalBlob)
