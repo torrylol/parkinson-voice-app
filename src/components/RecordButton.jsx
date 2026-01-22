@@ -15,10 +15,15 @@ function RecordButton({ onTranscription, isCommandMode }) {
   const maxRecordingTimerRef = useRef(null)
   const currentBatchChunksRef = useRef([])
   const isRecordingRef = useRef(false) // Ref version for immediate access in detectSilence
+  const prevCommandModeRef = useRef(isCommandMode) // Track previous command mode state
 
-  // Stop recording when switching to command mode
+  // Stop recording only when SWITCHING to command mode (not when already in it)
   useEffect(() => {
-    if (isCommandMode && isRecording) {
+    const wasCommandMode = prevCommandModeRef.current
+    prevCommandModeRef.current = isCommandMode
+
+    // Only stop if we just switched TO command mode while recording
+    if (isCommandMode && !wasCommandMode && isRecording) {
       stopRecording()
     }
   }, [isCommandMode, isRecording])
