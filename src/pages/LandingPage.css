@@ -1,0 +1,152 @@
+.landing-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-header {
+  text-align: center;
+  padding: 40px 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.landing-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.landing-subtitle {
+  font-size: 20px;
+  color: #666;
+  margin: 0;
+}
+
+.landing-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.landing-cards {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 900px;
+}
+
+.landing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 32px;
+  background: #fff;
+  border: 3px solid #e0e0e0;
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 280px;
+  max-width: 380px;
+  flex: 1;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.landing-card:hover {
+  border-color: #4CAF50;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.landing-card:focus {
+  outline: 3px solid #4CAF50;
+  outline-offset: 2px;
+  border-color: #4CAF50;
+}
+
+.landing-card-icon {
+  width: 100px;
+  height: 100px;
+  background: #E8F5E9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  color: #4CAF50;
+}
+
+.landing-card h2 {
+  font-size: 26px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+}
+
+.landing-card p {
+  font-size: 18px;
+  color: #666;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.landing-footer {
+  padding: 24px;
+  text-align: center;
+  border-top: 1px solid #e0e0e0;
+  color: #888;
+  font-size: 16px;
+}
+
+.landing-footer p {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .landing-header {
+    padding: 32px 20px;
+  }
+
+  .landing-header h1 {
+    font-size: 26px;
+  }
+
+  .landing-subtitle {
+    font-size: 18px;
+  }
+
+  .landing-cards {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .landing-card {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+    padding: 32px 24px;
+  }
+
+  .landing-card-icon {
+    width: 80px;
+    height: 80px;
+  }
+
+  .landing-card-icon svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .landing-card h2 {
+    font-size: 22px;
+  }
+
+  .landing-card p {
+    font-size: 16px;
+  }
+}

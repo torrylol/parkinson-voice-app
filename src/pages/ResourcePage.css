@@ -1,0 +1,153 @@
+.resource-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 24px;
+}
+
+.resource-article {
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.resource-header {
+  margin-bottom: 32px;
+}
+
+.resource-category-link {
+  display: inline-block;
+  font-size: 16px;
+  color: #666;
+  text-decoration: none;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.resource-category-link:hover {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.resource-category-link:focus {
+  outline: 3px solid #4CAF50;
+  outline-offset: 2px;
+}
+
+.resource-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+  line-height: 1.3;
+}
+
+.caregiver-tag-large {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #FFF3E0;
+  color: #E65100;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.resource-content {
+  font-size: 18px;
+  line-height: 1.7;
+  color: #333;
+}
+
+.resource-h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+  margin: 32px 0 16px 0;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.resource-h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.resource-h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #555;
+  margin: 24px 0 12px 0;
+}
+
+.resource-p {
+  margin: 0 0 16px 0;
+}
+
+.resource-list {
+  margin: 0 0 24px 0;
+  padding-left: 24px;
+}
+
+.resource-list li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+.resource-not-found {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.resource-not-found h1 {
+  font-size: 24px;
+  margin: 0 0 16px 0;
+}
+
+.resource-not-found p {
+  font-size: 18px;
+  color: #666;
+  margin: 0 0 24px 0;
+}
+
+.back-link {
+  display: inline-block;
+  padding: 16px 32px;
+  background: #4CAF50;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 500;
+  min-height: 48px;
+}
+
+.back-link:hover {
+  background: #43A047;
+}
+
+.back-link:focus {
+  outline: 3px solid #2E7D32;
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .resource-header h1 {
+    font-size: 24px;
+  }
+
+  .resource-content {
+    font-size: 16px;
+  }
+
+  .resource-h2 {
+    font-size: 20px;
+  }
+
+  .resource-h3 {
+    font-size: 17px;
+  }
+}
